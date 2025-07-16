@@ -14,38 +14,6 @@ window.addEventListener("load", async () => {
   initViewer(viewerDiv).then(viewer => {
     globalViewer = viewer;
   });
-  viewerToggle.onclick = async (cb) => {
-    try {
-      if (cb.target.checked) {
-        let itemId = urnInput.value;
-        let exchangeInfo = await (await fetch(`/api/hubs/exchanges/${itemId}`)).json();
-        let fileVersionUrn = '';
-        let components = JSON.parse(exchangeInfo).results[0].components.data.insert;
-
-        for (const key in components) {
-          if (key.startsWith('autodesk.data:exchange.host')) {
-            fileVersionUrn = findValue(components[key], "versionId");
-          }
-          if (key.startsWith('autodesk.fdx:host')) {
-            fileVersionUrn = findValue(components[key], "versionUrn");
-          }
-        }
-
-        await resizeGraphiql(graphiqlDiv, false);
-        await loadNDisplayModel(graphiqlDiv, viewerDiv, globalViewer, fileVersionUrn);
-      }
-      else {
-        hideModel(viewerDiv);
-        await resizeGraphiql(graphiqlDiv, true);
-      }
-    } catch (error) {
-      showToast(`Please, ensure you're logged in and using a valid item/version ID!`);
-      showHelpers('iteminput');
-      showHelpers('login');
-      console.error(error);
-      cb.target.checked = false;
-    }
-  }
   try {
     const resp = await fetch('/api/auth/profile');
     if (resp.ok) {
