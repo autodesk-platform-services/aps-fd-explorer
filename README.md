@@ -8,7 +8,7 @@ The sample is using this [GraphiQL project](https://github.com/graphql/graphiql)
 
 ## Setting up the app
 
-- clone this repository or download
+- clone this repository or download it
 - restore the packages
 - replace the variable values at appsettings.Development.json with your own
 
