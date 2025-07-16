@@ -1,0 +1,396 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Flow Data Explorer - BETA</title>
+    <meta charset="utf-8"/>
+    <link rel="shortcut icon" href="https://cdn.autodesk.io/favicon.ico">
+    <link rel="mask-icon" href="https://cdn.autodesk.io/favicon.ico">
+    <style>
+        body {
+            height: 100%;
+            margin: 0;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        #graphiql {
+            height: calc(100vh - 3em);
+        }
+    </style>
+    <link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.css">
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.0.0-alpha1/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="main.css"/>
+    <!-- This link will always fetch the latest version of Balloon.css -->
+    <link rel="stylesheet" href="https://unpkg.com/balloon-css/balloon.min.css">
+    <!--
+      This GraphiQL example depends on Promise and fetch, which are available in
+      modern browsers, but can be "polyfilled" for older browsers.
+      GraphiQL itself depends on React DOM.
+      If you do not want to rely on a CDN, you can host these files locally or
+      include them directly in your favored resource bundler.
+    -->
+    <script crossorigin src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+
+    <!--
+      These two files can be found in the npm module, however you may wish to
+      copy them directly into your environment, or perhaps include them in your
+      favored resource bundler.
+     -->
+    <link rel="stylesheet" href="https://unpkg.com/graphiql@2.0.13/graphiql.min.css"/>
+</head>
+
+<body>
+<div id="header">
+    <img class="logo" src="https://cdn.autodesk.io/logo/black/stacked.png" alt="Autodesk Platform Services">
+    <span class="title">Flow Data Explorer - BETA</span>
+    <div class="form-check form-switch form-switch-sm">
+        <input class="form-check-input" type="checkbox" id="toggleviewer" style="display: none">
+<!--        <label class="form-check-label" for="toggleviewer" style="margin:0.3em">Viewer</label>-->
+    </div>
+    <a type="button" class="btn btn-light mr-3" target="_blank" href="/voyager.html">
+        <img src="voyager.svg"
+             class="header-button"
+             width="24"
+             height="24"
+             title="Voyager"
+        /><span>&nbsp; Voyager</span>
+    </a>
+    <button id="login" style="visibility: hidden;" data-balloon-length="fit" aria-label="Login Here!"
+            data-balloon-pos="down">Login
+    </button>
+</div>
+<div id="graphiql"></div>
+<div id="viewer"></div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://unpkg.com/graphiql@2.0.13/graphiql.min.js" type="application/javascript"></script>
+<script src="main.js" type="module"></script>
+<script>
+    var globalViewer = '';
+    var queryResponse = '';
+    let defaultQuery = ``;
+    setInitialTabs();
+
+    function setInitialTabs() {
+        let tabState = JSON.parse(window.localStorage.getItem('graphiql:tabState'));
+        let tutorialTabs = [
+            {query: 'Step 1'},
+            {query: 'Step 2'},
+            {query: 'Step 3'},
+            {query: 'Step 4'},
+            {query: 'Step 5'},
+            {query: 'Step 6'},
+            {query: 'Step 7'},
+
+        ].map(ensureTutorialTab);
+
+        if (!!tabState) {
+            let nonTutorialTabs = tabState.tabs.filter(tab => !tab.query.match(/Step 1 – List all the collections you have access to|Step 2 – List the projects in the collection|Step 3 – Get project metadata|Step 4 – List assets in a project|Step 5 – Get details about a specific asset|Step 6 – Get Binary Component Urls|Step 7 – Fetch Binary Component/g))
+            tabState.tabs = tutorialTabs.concat(nonTutorialTabs);
+        } else {
+            tabState = {
+                activeTabIndex: 0,
+                tabs: []
+            };
+            tabState.tabs.push(...tutorialTabs);
+        }
+        let tabStateString = JSON.stringify(tabState);
+        window.localStorage.setItem('graphiql:tabState', tabStateString);
+
+    }
+
+    function generateUUID() {
+        let
+            d = new Date().getTime(),
+            d2 = (performance && performance.now && (performance.now() * 1000)) || 0;
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            let r = Math.random() * 16;
+            if (d > 0) {
+                r = (d + r) % 16 | 0;
+                d = Math.floor(d / 16);
+            } else {
+                r = (d2 + r) % 16 | 0;
+                d2 = Math.floor(d2 / 16);
+            }
+            return (c == 'x' ? r : (r & 0x7 | 0x8)).toString(16);
+        });
+    };
+
+
+    function ensureTutorialTab(tab) {
+        let task = tab.query;
+        tab.hash = null;
+        tab.headers = null;
+        tab.id = generateUUID();
+        tab.operationName = null;
+        tab.response = null;
+        tab.variables = null;
+        switch (task) {
+            case 'Step 1':
+                tab.title = 'Access Collections';
+                tab.query = `# Step 1 – List all the collections you have access to
+query AccessCollections($input:GetCollectionsInput) {
+  collections (input:$input){
+    ... on CollectionsResponse {
+      data {
+        id
+      }
+    }
+  }
+}`;
+
+                tab.variables = `{
+  "input": {
+    "pagination": {
+      "limit": 5
+    }
+  }
+}`;
+                break;
+            case 'Step 2':
+                tab.title = 'GetProjects';
+                tab.query = `# Step 2 – List the projects in the collection
+query GetProjects($input: GetProjectsInput!) {
+  projects(input: $input) {
+    ... on ProjectsResponse {
+      data {
+        description
+        id
+        name
+      }
+    }
+  }
+}`;
+                tab.variables = `{
+  "input": {
+    "collectionId": ""
+  }
+}`;
+
+
+                break;
+            case 'Step 3':
+                tab.title = 'GetProjectDetails';
+                tab.query = `# Step 3 – Get project metadata
+query GetProjectDetails($projectId: ID!) {
+  project(id: $projectId) {
+    ... on Project {
+      name
+      description
+      components {
+        data
+      }
+    }
+  }
+}`;
+
+                tab.variables = `{
+  "projectId":""
+}`;
+                break;
+            case 'Step 4':
+                tab.title = 'GetAssets';
+                tab.query = `# Step 4 – List assets in a project
+query GetAssets($input: FindAssetsInput!) {
+  assets(input: $input) {
+    ... on AssetsResponse {
+      data {
+        id
+        name
+      }
+      pagination {
+        cursor
+        pageSize
+      }
+    }
+  }
+}
+`;
+
+                tab.variables = `{
+  "input": {
+    "projectId": "",
+    "pagination": {
+      "cursor": "",
+      "limit": 10
+    }
+  }
+}`;
+                break;
+            case 'Step 5':
+                tab.title = 'GetAssetDetails';
+                tab.query = `# Step 5 – Get details about a specific asset
+query GetAssetDetails($input: GetAssetInput) {
+  asset(input: $input) {
+    ... on Asset {
+      description
+      hasChildren
+      id
+      name
+      path {
+        ... on AssetPathResponse {
+          data {
+            ... on Project {
+              description
+              name
+            }
+          }
+        }
+      }
+      revisionId
+      version
+      components {
+        name
+        typeId
+        typeName
+        data
+      }
+    }
+  }
+}
+`;
+                tab.variables = `{
+  "input": {
+    "id": ""
+  }
+}`;
+                break;
+            case 'Step 6':
+                tab.title = 'GetBinaryComponentsUrls';
+                tab.query = `# Step 6 – Get Binary Component Urls
+query GetBinaryComponentsUrls($input: GetAssetInput) {
+  asset(input: $input) {
+    ... on Asset {
+      path {
+        ... on AssetPathResponse {
+          data {
+            ... on Asset {
+              description
+              name
+              path {
+                ... on AssetPathResponse {
+                  data {
+                    ... on Project {
+                      components {
+                        data
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+`;
+                tab.variables = `{
+  "input": {
+    "id": ""
+  }
+}`;
+                break;
+            case 'Step 7':
+                tab.title = 'FetchBinaryComponents';
+                tab.query = `# Step 7 – Fetch Binary Component
+query FetchBinaryComponentsUrls($input: FetchBinaryComponentUrlsInput!) {
+  fetchBinaryComponentsUrls(input: $input) {
+    urls {
+      url
+    }
+  }
+}
+`;
+                tab.variables = `{
+  "input": {
+    "collectionId": "",
+    "urns": []
+  }
+}`;
+                break;
+        }
+        return tab;
+    }
+
+    async function graphQLFetcher(graphQLParams, opts) {
+        // check if existing token still valid, if not refresh
+        let res = await fetch(`api/auth/token`);
+        let resJSON = await res.json();
+        accessToken = resJSON.access_token;
+        if (accessToken === undefined) {
+            showHelpers('login');
+            return 'Please login first';
+        }
+
+        const {headers = {}} = opts;
+        return fetch(
+            "https://developer.api.autodesk.com/flow/data/v1/graphql",
+            {
+                method: "post",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: "Bearer " + accessToken,
+                    ...headers,
+                },
+                body: JSON.stringify(graphQLParams),
+            }
+        ).then(async (response) => {
+            queryResponse = await response.json();
+            if (!!globalViewer) {
+                globalViewer.getExtension('DXFilterExtension').filterModel();
+            }
+            return queryResponse;
+        });
+    }
+
+    function onTabs(data) {
+        console.log(data)
+    }
+
+    async function showHelpers(elementId) {
+        let itemInput = document.getElementById(elementId);
+        itemInput.setAttribute('data-balloon-visible', '');
+        setTimeout(() => {
+            itemInput.removeAttribute('data-balloon-visible', '');
+        }, 5000);
+    }
+
+    class GraphiQLWrapper extends React.Component {
+        componentDidMount() {
+            const graphiqlContainer = document.getElementsByClassName('graphiql-container')[0];
+            if (graphiqlContainer) {
+                graphiqlContainer.style.overflow = 'auto';
+            }
+        }
+
+        render() {
+            return React.createElement(GraphiQL, {
+                fetcher: this.props.fetcher,
+                defaultEditorToolsVisibility: this.props.defaultEditorToolsVisibility,
+                onTabs: this.props.onTabs,
+                query: this.props.query,
+                defaultQuery: this.props.defaultQuery,
+            });
+        }
+    }
+
+    ReactDOM.render(
+        React.createElement(GraphiQLWrapper, {
+            fetcher: graphQLFetcher,
+            defaultEditorToolsVisibility: true,
+            onTabs: onTabs,
+            query: defaultQuery,
+            defaultQuery: {defaultQuery},
+        }),
+        document.getElementById('graphiql'),
+    );
+</script>
+<script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.js"></script>
+</body>
+
+</html>
