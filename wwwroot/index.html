@@ -226,7 +226,6 @@ query GetAssetDetails($input: GetAssetInput) {
   asset(input: $input) {
     ... on Asset {
       description
-      hasChildren
       id
       name
       path {
